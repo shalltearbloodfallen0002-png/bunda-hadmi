@@ -10,7 +10,7 @@
 {% if not request.path.startswith('/admin') %}
 <div class="topbar">Pesanan katering lebih praktis · Tentukan tanggal pengantaran sesuai kebutuhanmu</div>
 <header class="navbar"><div class="nav-inner">
-  <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">🍃</span><span>Bunda Hadmi</span></a>
+  <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">🍃</span><span>Hadmi's Kitchen</span></a>
   <nav class="nav-links">
     <a href="{{ url_for('index') }}">Beranda</a><a href="{{ url_for('index') }}#menu">Menu</a>
     <a href="{{ url_for('track_order') }}">Lacak Pesanan</a><a href="{{ url_for('order_history') }}">Riwayat</a>
@@ -24,7 +24,7 @@
 {% block content %}{% endblock %}
 {% if not request.path.startswith('/admin') %}
 <footer class="footer"><div class="container"><div class="footer-grid">
-  <div><a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">🍃</span><span>Bunda Hadmi</span></a><p>Menyediakan hidangan rumahan dan paket katering untuk menemani berbagai momen spesialmu. Pesan lebih awal, nikmati dengan tenang.</p></div>
+  <div><a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">🍃</span><span>Hadmi’s Kitchen</span></a><p>Menyediakan hidangan rumahan dan paket katering untuk menemani berbagai momen spesialmu. Pesan lebih awal, nikmati dengan tenang.</p></div>
   <div class="footer-links"><a href="{{ url_for('index') }}">Beranda</a><a href="{{ url_for('track_order') }}">Lacak Pesanan</a><a href="{{ url_for('admin_login') }}">Admin</a></div>
 </div><div class="copyright">© 2026 Cathering Bunda Hadmi · Sistem Pemesanan Makanan</div></div></footer>
 {% endif %}
