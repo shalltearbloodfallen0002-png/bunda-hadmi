@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero"><div class="container hero-grid">
+  <div><div class="eyebrow">Cathering Bunda Hadmi</div><h1>Hidangan lezat, disiapkan untuk hari istimewamu.</h1>
+  <p>Pilih menu favorit, tentukan jumlah dan tanggal pengantaran. Pemesanan katering jadi lebih mudah dan teratur.</p>
+  <a class="btn btn-primary" href="#menu">Jelajahi Menu <span>→</span></a></div>
+  <div class="hero-art"><div class="float-note one">♡ Dibuat dengan sepenuh hati</div><div class="hero-emoji">🍱</div><div class="float-note two">Fresh · Homemade · Delicious</div></div>
+</div></section>
+<section class="section" id="menu"><div class="container">
+  <div class="section-head"><div><div class="eyebrow">Pilihan untukmu</div><h2>Menu favorit</h2><p>Temukan hidangan yang cocok untuk acaramu.</p></div>
+  <form class="search-form" method="get"><input class="search-input" name="q" value="{{ q }}" placeholder="Cari menu..."><button class="btn btn-primary">Cari</button></form></div>
+  <div class="filter-row"><a class="chip {{ 'active' if not selected else '' }}" href="{{ url_for('index',q=q) }}">Semua menu</a>{% for c in categories %}<a class="chip {{ 'active' if selected==c.id else '' }}" href="{{ url_for('index',category=c.id,q=q) }}">{{ c.name }}</a>{% endfor %}</div>
+  {% if menus %}<div class="menu-grid">{% for item in menus %}
+  <article class="menu-card"><a href="{{ url_for('menu_detail',menu_id=item.id) }}"><div class="food-art"><span class="food-tag">{{ item.category_name or 'Menu' }}</span>{{ item.image or '🍱' }}</div></a>
+    <div class="menu-body"><a href="{{ url_for('menu_detail',menu_id=item.id) }}"><h3>{{ item.name }}</h3></a><p>{{ item.description }}</p><div class="price-row"><span class="price">{{ item.price|rupiah }}</span><form method="post" action="{{ url_for('add_to_cart',menu_id=item.id) }}"><input type="hidden" name="quantity" value="1"><button class="add-circle" aria-label="Tambah {{ item.name }}">+</button></form></div></div></article>
+  {% endfor %}</div>{% else %}<div class="empty"><div class="icon">🍽️</div><h3>Menu belum ditemukan</h3><p>Coba kata kunci atau kategori yang berbeda.</p><a class="btn btn-light" href="{{ url_for('index') }}">Lihat semua menu</a></div>{% endif %}
+</div></section>
+<section style="background:var(--cream);padding:35px 0"><div class="container" style="display:flex;justify-content:space-around;gap:20px;flex-wrap:wrap;text-align:center"><div>📅 <b>Pesan terjadwal</b><div class="muted" style="font-size:12px">Tentukan tanggal pengantaran</div></div><div>🥗 <b>Menu beragam</b><div class="muted" style="font-size:12px">Pilih sesuai kebutuhan</div></div><div>💚 <b>Mudah digunakan</b><div class="muted" style="font-size:12px">Alur pemesanan sederhana</div></div></div></section>
+{% endblock %}

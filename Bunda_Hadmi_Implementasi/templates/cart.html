@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Keranjang — Bunda Hadmi{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div class="container">
+        <h1>Keranjang belanja</h1>
+        <p>Periksa kembali pilihan menu sebelum membuat pesanan.</p>
+    </div>
+</div>
+
+<div class="content">
+    <div class="container">
+
+        {% if cart %}
+        <form method="post" action="{{ url_for('update_cart') }}">
+
+            <div class="two-col">
+                <div class="panel">
+                    <h3 style="margin-top:0">Menu pilihanmu</h3>
+
+                    {% for key,item in cart.items() %}
+                    <div class="cart-item">
+
+                        <div class="cart-emoji">
+                            {{ item.image or '🍱' }}
+                        </div>
+
+                        <div>
+                            <b>{{ item.name }}</b>
+
+                            <div class="muted" style="font-size:12px">
+                                {{ item.price|rupiah }} / item
+                            </div>
+
+                            {% if item.customization %}
+                            <small class="muted">
+                                Catatan: {{ item.customization }}
+                            </small>
+                            {% endif %}
+
+                            <div style="margin-top:7px">
+                                <label class="muted" style="font-size:11px">
+                                    Jumlah
+                                </label>
+
+                                <input
+                                    class="qty-input"
+                                    type="number"
+                                    name="qty_{{ key }}"
+                                    min="0"
+                                    max="99"
+                                    value="{{ item.quantity }}"
+                                >
+                            </div>
+                        </div>
+
+                        <div style="text-align:right">
+                            <b>{{ (item.price*item.quantity)|rupiah }}</b>
+
+                            <button
+                                class="btn btn-small btn-danger"
+                                type="submit"
+                                formaction="{{ url_for('remove_cart_item', key=key) }}"
+                                formmethod="POST"
+                                formnovalidate
+                                style="margin-top:8px"
+                            >
+                                Hapus
+                            </button>
+                        </div>
+
+                    </div>
+                    {% endfor %}
+
+                    <button class="btn btn-outline" style="margin-top:16px">
+                        Perbarui keranjang
+                    </button>
+                </div>
+
+                <div class="panel">
+                    <h3 style="margin-top:0">Ringkasan</h3>
+
+                    {% set ns=namespace(total=0) %}
+                    {% for item in cart.values() %}
+                        {% set ns.total=ns.total+item.price*item.quantity %}
+                    {% endfor %}
+
+                    <div class="summary-line">
+                        <span>Total item</span>
+                        <b>{{ cart_count }}</b>
+                    </div>
+
+                    <div class="summary-line">
+                        <span>Subtotal</span>
+                        <b>{{ ns.total|rupiah }}</b>
+                    </div>
+
+                    <div class="summary-line">
+                        <span>Pengantaran</span>
+                        <span>Dikonfirmasi admin</span>
+                    </div>
+
+                    <div class="summary-line total">
+                        <span>Total sementara</span>
+                        <span>{{ ns.total|rupiah }}</span>
+                    </div>
+
+                    <a class="btn btn-primary"
+                       style="width:100%;margin-top:15px"
+                       href="{{ url_for('checkout') }}">
+                        Lanjut pemesanan →
+                    </a>
+
+                    <p class="muted" style="font-size:11px">
+                        Biaya pengantaran (jika ada) akan dikonfirmasi oleh admin.
+                    </p>
+                </div>
+            </div>
+
+        </form>
+
+        {% else %}
+        <div class="empty">
+            <div class="icon">🧺</div>
+            <h2>Keranjangmu masih kosong</h2>
+            <p>Yuk, pilih menu yang kamu suka.</p>
+
+            <a class="btn btn-primary" href="{{ url_for('index') }}">
+                Jelajahi menu
+            </a>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}

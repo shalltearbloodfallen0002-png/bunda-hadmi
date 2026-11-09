@@ -1,0 +1,23 @@
+# Virtual environment Python
+venv/
+.venv/
+
+# Cache Python
+__pycache__/
+*.pyc
+
+# File konfigurasi rahasia
+.env
+.env.*
+
+# Database lokal
+**/instance/*.db
+*.sqlite
+*.sqlite3
+
+# File sistem
+.DS_Store
+Thumbs.db
+
+# Log
+*.log
