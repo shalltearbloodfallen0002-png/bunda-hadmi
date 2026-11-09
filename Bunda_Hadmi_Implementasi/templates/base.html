@@ -2,20 +2,20 @@
 <html lang="id">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Sistem pemesanan makanan Cathering Bunda Hadmi">
-  <title>{% block title %}Bunda Hadmi — Pesan Makanan dengan Mudah{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <meta name="description" content="Pesan hidangan rumahan dan katering Hadmi’s Kitchen dengan mudah untuk momen istimewamu.">
+  <title>{% block title %}Hadmi’s Kitchen — Pesan Makanan dengan Mudah{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=2) }}">
 </head>
 <body>
 {% if not request.path.startswith('/admin') %}
-<div class="topbar">Pesanan katering lebih praktis · Tentukan tanggal pengantaran sesuai kebutuhanmu</div>
+<div class="topbar"><span class="topbar-dot"></span>Masakan rumahan, siap menemani hari spesialmu <span class="topbar-divider">·</span> Pesan online dengan mudah</div>
 <header class="navbar"><div class="nav-inner">
-  <a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">🍃</span><span>Bunda Hadmi</span></a>
+  <a class="brand" href="{{ url_for('index') }}"><img class="brand-mark" src="{{ url_for('static', filename='images/bunda-hadmi-logo.svg') }}" alt=""><span class="brand-copy">Hadmi’s <b>Kitchen</b><small>Hidangan penuh cinta</small></span></a>
   <nav class="nav-links">
     <a href="{{ url_for('index') }}">Beranda</a><a href="{{ url_for('index') }}#menu">Menu</a>
     <a href="{{ url_for('track_order') }}">Lacak Pesanan</a><a href="{{ url_for('order_history') }}">Riwayat</a>
   </nav>
-  <div class="nav-actions"><a class="cart-link" href="{{ url_for('cart') }}">🛒 Keranjang{% if cart_count %} · {{ cart_count }}{% endif %}</a></div>
+  <div class="nav-actions"><a class="cart-link" href="{{ url_for('cart') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.2 11.1a2 2 0 0 0 2 1.6h8.5a2 2 0 0 0 1.9-1.4L22 8H6"/><circle cx="10" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg><span>Keranjang</span>{% if cart_count %}<span class="cart-count">{{ cart_count }}</span>{% endif %}</a></div>
 </div></header>
 {% endif %}
 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -24,9 +24,9 @@
 {% block content %}{% endblock %}
 {% if not request.path.startswith('/admin') %}
 <footer class="footer"><div class="container"><div class="footer-grid">
-  <div><a class="brand" href="{{ url_for('index') }}"><span class="brand-mark">🍃</span><span>Bunda Hadmi</span></a><p>Menyediakan hidangan rumahan dan paket katering untuk menemani berbagai momen spesialmu. Pesan lebih awal, nikmati dengan tenang.</p></div>
+  <div><a class="brand footer-brand" href="{{ url_for('index') }}"><img class="brand-mark" src="{{ url_for('static', filename='images/bunda-hadmi-logo.svg') }}" alt=""><span class="brand-copy">Hadmi’s <b>Kitchen</b><small>Hidangan penuh cinta</small></span></a><p>Menyediakan hidangan rumahan dan paket katering untuk menemani berbagai momen spesialmu. Pesan lebih awal, nikmati dengan tenang.</p></div>
   <div class="footer-links"><a href="{{ url_for('index') }}">Beranda</a><a href="{{ url_for('track_order') }}">Lacak Pesanan</a><a href="{{ url_for('admin_login') }}">Admin</a></div>
-</div><div class="copyright">© 2026 Cathering Bunda Hadmi · Sistem Pemesanan Makanan</div></div></footer>
+</div><div class="copyright">© 2026 Hadmi’s Kitchen · Sistem Pemesanan Makanan</div></div></footer>
 {% endif %}
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body></html>
