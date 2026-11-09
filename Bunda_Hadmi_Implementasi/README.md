@@ -1,4 +1,4 @@
-# Sistem Pemesanan Makanan — Cathering Bunda Hadmi
+# Hadmi’s Kitchen — Sistem Pemesanan Makanan
 
 Aplikasi web demo berbasis Flask + SQLite yang mengikuti SKPL Kelompok 3.
 
@@ -8,6 +8,7 @@ Aplikasi web demo berbasis Flask + SQLite yang mengikuti SKPL Kelompok 3.
 - Menambahkan makanan ke keranjang, mengubah jumlah, menghapus item, dan menambahkan catatan penyesuaian.
 - Checkout dengan nama, nomor telepon, alamat, dan tanggal pengantaran.
 - Melihat ringkasan pesanan, melacak status menggunakan kode pesanan + nomor telepon, dan melihat riwayat menggunakan nomor telepon.
+- Memilih transfer bank atau QRIS, melihat instruksi pembayaran, dan mengunggah bukti pembayaran untuk diverifikasi Admin.
 
 ### Admin
 - Login admin.
@@ -15,6 +16,7 @@ Aplikasi web demo berbasis Flask + SQLite yang mengikuti SKPL Kelompok 3.
 - CRUD menu, harga, kategori, dan ketersediaan.
 - Melihat pesanan, konfirmasi, dan mengubah status.
 - Mengubah status pembayaran secara manual.
+- Mengatur detail rekening bank dan gambar QRIS, serta memeriksa bukti transfer pelanggan.
 - Rekap penjualan per bulan.
 - Pencatatan stok bahan masak.
 
@@ -52,7 +54,7 @@ Ganti kredensial dan `SECRET_KEY` sebelum digunakan di lingkungan publik. Akun d
 
 ## Catatan kesesuaian SKPL
 - Pelanggan tidak wajib membuat akun. Pencarian riwayat dan pelacakan menggunakan nomor telepon serta kode pesanan.
-- Pembayaran daring belum terhubung ke penyedia/payment gateway karena penyedia dan alurnya belum ditentukan dalam SKPL. Pilihan metode pembayaran dan statusnya disediakan sebagai simulasi/manual admin.
+- Pembayaran menggunakan transfer bank atau QRIS statis yang diatur Admin; pelanggan mengirim bukti gambar dan Admin memverifikasinya secara manual. Payment gateway dan konfirmasi transaksi otomatis tidak disediakan.
 - Biaya pengantaran saat ini Rp0 karena aturan biaya belum ditentukan.
 - Pengurangan stok bahan otomatis belum diterapkan; stok dicatat dan diperbarui manual oleh admin, sesuai hal yang masih perlu dikonfirmasi kepada klien.
 - Data menu awal adalah data contoh dan dapat diganti dari dashboard admin.
@@ -91,6 +93,7 @@ bunda_hadmi/
 - Pelanggan dapat membatalkan pesanan hanya saat status masih **Menunggu Konfirmasi** melalui halaman lacak.
 - Admin dan Super Admin dapat membatalkan pesanan yang belum selesai/berstatus akhir dengan mengisi alasan.
 - Riwayat pembatalan menyimpan pelaku, alasan, dan waktu.
+- Metode transfer bank dan QRIS baru aktif setelah Admin mengaturnya di menu **Pembayaran**. Bukti pembayaran dibatasi ke gambar JPG, PNG, atau WebP hingga 5 MB.
 - Migrasi menambahkan kolom database secara bertahap; tabel dan pesanan lama tidak dihapus.
 
 **Akun awal:** `admin` / `admin123`. Segera ganti password sebelum sistem digunakan di luar komputer pengembangan. Jalankan dengan `python app.py`.

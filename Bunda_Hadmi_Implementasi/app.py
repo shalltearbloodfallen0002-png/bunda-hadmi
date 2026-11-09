@@ -1,8 +1,9 @@
-import os, sqlite3
+import os, sqlite3, uuid
 from datetime import datetime, date
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, session, flash, g, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, g, jsonify, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DATABASE = os.path.join(BASE_DIR, "instance", "bunda_hadmi.db")
@@ -11,9 +12,17 @@ os.makedirs(os.path.dirname(DATABASE), exist_ok=True)
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "ganti-secret-key-untuk-produksi")
 app.config["DATABASE"] = DATABASE
+app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
+PAYMENT_UPLOAD_DIR = os.path.join(BASE_DIR, "instance", "payment_uploads")
+PAYMENT_IMAGE_TYPES = {
+    ".jpg": ("image/jpeg",),
+    ".jpeg": ("image/jpeg",),
+    ".png": ("image/png",),
+    ".webp": ("image/webp",),
+}
 
 STATUSES = ["Menunggu Konfirmasi", "Dikonfirmasi", "Diproses", "Siap Diantar", "Dalam Pengantaran", "Selesai", "Ditolak"]
-CANCELLABLE_STATUSES = ["Menunggu Konfirmasi", "Dikonfirmasi", "Diproses", "Siap Diantar", "Dalam Pengantaran"]
+CANCELLABLE_STATUSES = ["Menunggu Konfirmasi"]
 
 def get_db():
     if "db" not in g:
@@ -21,6 +30,36 @@ def get_db():
         g.db.row_factory = sqlite3.Row
         g.db.execute("PRAGMA foreign_keys = ON")
     return g.db
+
+def get_payment_settings():
+    return get_db().execute("SELECT * FROM payment_settings WHERE id=1").fetchone()
+
+def available_payment_methods(settings):
+    methods = []
+    if settings["bank_name"] and settings["bank_account"] and settings["bank_holder"]:
+        methods.append("Transfer bank")
+    if settings["qris_image"]:
+        methods.append("QRIS")
+    return methods
+
+def save_payment_image(upload, prefix):
+    extension = os.path.splitext(secure_filename(upload.filename or ""))[1].lower()
+    allowed_mimes = PAYMENT_IMAGE_TYPES.get(extension)
+    if not allowed_mimes or upload.mimetype not in allowed_mimes:
+        raise ValueError("Unggah gambar JPG, PNG, atau WebP yang valid.")
+    content = upload.read()
+    upload.seek(0)
+    valid_signature = (
+        (extension in (".jpg", ".jpeg") and content.startswith(b"\xff\xd8\xff"))
+        or (extension == ".png" and content.startswith(b"\x89PNG\r\n\x1a\n"))
+        or (extension == ".webp" and content.startswith(b"RIFF") and content[8:12] == b"WEBP")
+    )
+    if not valid_signature:
+        raise ValueError("Isi file tidak sesuai dengan format gambar yang dipilih.")
+    os.makedirs(PAYMENT_UPLOAD_DIR, exist_ok=True)
+    filename = f"{prefix}-{uuid.uuid4().hex}{extension}"
+    upload.save(os.path.join(PAYMENT_UPLOAD_DIR, filename))
+    return filename
 
 @app.teardown_appcontext
 def close_db(_error=None):
@@ -63,6 +102,12 @@ def init_db():
       id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, quantity REAL DEFAULT 0,
       unit TEXT NOT NULL, updated_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS payment_settings (
+      id INTEGER PRIMARY KEY CHECK (id=1), bank_name TEXT NOT NULL DEFAULT '',
+      bank_account TEXT NOT NULL DEFAULT '', bank_holder TEXT NOT NULL DEFAULT '',
+      qris_image TEXT NOT NULL DEFAULT ''
+    );
+    INSERT OR IGNORE INTO payment_settings(id) VALUES(1);
     """)
     # Migrasi aman: menambahkan kolom tanpa menghapus data lama.
     admin_columns = {row[1] for row in db.execute("PRAGMA table_info(admins)").fetchall()}
@@ -73,6 +118,8 @@ def init_db():
         ("cancelled_by", "TEXT"),
         ("cancellation_reason", "TEXT"),
         ("cancelled_at", "TEXT"),
+        ("payment_proof", "TEXT"),
+        ("payment_submitted_at", "TEXT"),
     ]:
         if column not in order_columns:
             db.execute(f"ALTER TABLE orders ADD COLUMN {column} {definition}")
@@ -108,6 +155,26 @@ def init_db():
 @app.template_filter("rupiah")
 def rupiah(value):
     return "Rp{:,.0f}".format(value or 0).replace(",", ".")
+
+@app.template_filter("menu_photo")
+def menu_photo(item):
+    image = item["image"] if "image" in item.keys() else ""
+    if image and (image.startswith("https://") or image.startswith("/static/")):
+        return image
+
+    name = (item["name"] or "").lower()
+    photo_by_name = [
+        ("ayam bakar", "photo-1604908176997-125f25cc6f3d"),
+        ("ayam kremes", "photo-1626082927389-6cd097cdc6ec"),
+        ("rendang", "photo-1603894584373-5ac82b2ae398"),
+        ("liwet", "photo-1512058564366-18510be2db19"),
+        ("risoles", "photo-1601050690597-df0568f70950"),
+        ("pastel", "photo-1601050690117-94f5f6fa8bd7"),
+        ("puding", "photo-1488477181946-6428a0291777"),
+        ("teh", "photo-1556679343-c7306c1976bc"),
+    ]
+    photo_id = next((photo for keyword, photo in photo_by_name if keyword in name), "photo-1504674900247-0877df9cc836")
+    return f"https://images.unsplash.com/{photo_id}?auto=format&fit=crop&w=900&q=85"
 
 @app.context_processor
 def inject_globals():
@@ -208,13 +275,15 @@ def checkout():
     if not cart_data:
         flash("Keranjang masih kosong.", "warning"); return redirect(url_for("index"))
     subtotal = sum(x["price"] * x["quantity"] for x in cart_data.values())
+    payment_settings = get_payment_settings()
+    payment_methods = available_payment_methods(payment_settings)
     if request.method == "POST":
         name = request.form.get("customer_name", "").strip()
         phone = request.form.get("phone", "").strip()
         address = request.form.get("address", "").strip()
         delivery_date = request.form.get("delivery_date", "").strip()
         notes = request.form.get("notes", "").strip()
-        payment_method = request.form.get("payment_method", "Bayar saat konfirmasi")
+        payment_method = request.form.get("payment_method", "")
         errors = []
         if len(name) < 2: errors.append("Nama harus diisi minimal 2 karakter.")
         if len(phone) < 8: errors.append("Nomor telepon belum valid.")
@@ -224,9 +293,12 @@ def checkout():
             if parsed < date.today(): errors.append("Tanggal pengantaran tidak boleh di masa lalu.")
         except ValueError:
             errors.append("Tanggal pengantaran wajib dipilih.")
+        if payment_method not in payment_methods:
+            errors.append("Pilih metode pembayaran yang sudah dikonfigurasi oleh Admin.")
         if errors:
             for e in errors: flash(e, "danger")
-            return render_template("checkout.html", cart=cart_data, subtotal=subtotal, form=request.form)
+            return render_template("checkout.html", cart=cart_data, subtotal=subtotal, form=request.form,
+                                   payment_settings=payment_settings, payment_methods=payment_methods)
         db = get_db()
         ids = [x["menu_id"] for x in cart_data.values()]
         placeholders = ",".join("?" for _ in ids)
@@ -250,13 +322,14 @@ def checkout():
         session["cart"] = {}
         session["last_order_code"] = code
         return redirect(url_for("order_success", code=code))
-    return render_template("checkout.html", cart=cart_data, subtotal=subtotal, form={})
+    return render_template("checkout.html", cart=cart_data, subtotal=subtotal, form={},
+                           payment_settings=payment_settings, payment_methods=payment_methods)
 
 @app.route("/pesanan/berhasil/<code>")
 def order_success(code):
     order = get_db().execute("SELECT * FROM orders WHERE code=?", (code,)).fetchone()
     if not order: return redirect(url_for("index"))
-    return render_template("order_success.html", order=order)
+    return render_template("order_success.html", order=order, payment_settings=get_payment_settings())
 
 @app.route("/lacak", methods=["GET", "POST"])
 def track_order():
@@ -270,7 +343,56 @@ def track_order():
             items = get_db().execute("SELECT * FROM order_items WHERE order_id=?", (order["id"],)).fetchall()
         else:
             flash("Pesanan tidak ditemukan. Periksa kode pesanan dan nomor telepon.", "danger")
-    return render_template("track.html", order=order, items=items)
+    return render_template("track.html", order=order, items=items,
+                           cancellable_statuses=CANCELLABLE_STATUSES,
+                           payment_settings=get_payment_settings())
+
+@app.post("/pesanan/bukti/<code>")
+def submit_payment_proof(code):
+    phone = request.form.get("phone", "").strip()
+    order = get_db().execute("SELECT * FROM orders WHERE code=? AND phone=?", (code, phone)).fetchone()
+    if not order:
+        flash("Pesanan tidak ditemukan. Periksa kode pesanan dan nomor telepon.", "danger")
+        return redirect(url_for("track_order"))
+    items = get_db().execute("SELECT * FROM order_items WHERE order_id=?", (order["id"],)).fetchall()
+    if order["payment_method"] not in ("Transfer bank", "QRIS"):
+        flash("Unggah bukti hanya tersedia untuk pembayaran transfer bank atau QRIS.", "warning")
+    elif order["payment_status"] == "Lunas":
+        flash("Pembayaran pesanan ini sudah diverifikasi lunas.", "warning")
+    elif order["status"] in ("Dibatalkan", "Ditolak", "Selesai"):
+        flash("Bukti pembayaran tidak dapat dikirim untuk pesanan berstatus akhir.", "warning")
+    else:
+        upload = request.files.get("payment_proof")
+        if not upload or not upload.filename:
+            flash("Pilih file bukti pembayaran terlebih dahulu.", "danger")
+        else:
+            try:
+                filename = save_payment_image(upload, "proof")
+            except ValueError as error:
+                flash(str(error), "danger")
+            else:
+                db = get_db()
+                result = db.execute("""UPDATE orders SET payment_proof=?, payment_submitted_at=?,
+                                       payment_status='Menunggu verifikasi'
+                                       WHERE id=? AND payment_status!='Lunas'
+                                         AND status NOT IN ('Dibatalkan','Ditolak','Selesai')""",
+                                    (filename, datetime.now().isoformat(timespec="minutes"), order["id"]))
+                db.commit()
+                order = db.execute("SELECT * FROM orders WHERE id=?", (order["id"],)).fetchone()
+                if result.rowcount == 1:
+                    flash("Bukti pembayaran terkirim. Admin akan memeriksa pembayaranmu.", "success")
+                else:
+                    flash("Status pesanan berubah. Bukti pembayaran tidak dapat dikirim.", "warning")
+    return render_template("track.html", order=order, items=items,
+                           cancellable_statuses=CANCELLABLE_STATUSES,
+                           payment_settings=get_payment_settings())
+
+@app.get("/pembayaran/qris/<filename>")
+def payment_qris_image(filename):
+    settings = get_payment_settings()
+    if filename != settings["qris_image"]:
+        return "", 404
+    return send_from_directory(PAYMENT_UPLOAD_DIR, filename)
 
 @app.post("/pesanan/batal/<code>")
 def customer_cancel_order(code):
@@ -281,15 +403,30 @@ def customer_cancel_order(code):
     if not order:
         flash("Pesanan tidak ditemukan. Periksa kode pesanan dan nomor telepon.", "danger")
         return redirect(url_for("track_order"))
-    if order["status"] != "Menunggu Konfirmasi":
-        flash("Pesanan hanya dapat dibatalkan pelanggan sebelum dikonfirmasi.", "warning")
-        return redirect(url_for("track_order"))
-    db.execute("""UPDATE orders SET status='Dibatalkan', cancelled_by='Pelanggan',
-                  cancellation_reason=?, cancelled_at=? WHERE id=? AND status='Menunggu Konfirmasi'""",
-               (reason, datetime.now().isoformat(timespec="minutes"), order["id"]))
+    items = db.execute("SELECT * FROM order_items WHERE order_id=?", (order["id"],)).fetchall()
+    if order["status"] not in CANCELLABLE_STATUSES:
+        flash(f"Pesanan berstatus {order['status']} tidak dapat dibatalkan pelanggan. "
+              "Pembatalan hanya tersedia saat Menunggu Konfirmasi.", "warning")
+        return render_template("track.html", order=order, items=items,
+                               cancellable_statuses=CANCELLABLE_STATUSES,
+                               payment_settings=get_payment_settings())
+    result = db.execute("""UPDATE orders SET status='Dibatalkan', cancelled_by='Pelanggan',
+                           cancellation_reason=?, cancelled_at=?
+                           WHERE id=? AND status='Menunggu Konfirmasi'""",
+                        (reason, datetime.now().isoformat(timespec="minutes"), order["id"]))
+    if result.rowcount != 1:
+        order = db.execute("SELECT * FROM orders WHERE id=?", (order["id"],)).fetchone()
+        flash(f"Pesanan berstatus {order['status']} tidak dapat dibatalkan pelanggan. "
+              "Pembatalan hanya tersedia saat Menunggu Konfirmasi.", "warning")
+        return render_template("track.html", order=order, items=items,
+                               cancellable_statuses=CANCELLABLE_STATUSES,
+                               payment_settings=get_payment_settings())
     db.commit()
+    order = db.execute("SELECT * FROM orders WHERE id=?", (order["id"],)).fetchone()
     flash("Pesanan berhasil dibatalkan.", "success")
-    return redirect(url_for("track_order"))
+    return render_template("track.html", order=order, items=items,
+                           cancellable_statuses=CANCELLABLE_STATUSES,
+                           payment_settings=get_payment_settings())
 
 @app.route("/riwayat", methods=["GET", "POST"])
 def order_history():
@@ -343,7 +480,7 @@ def admin_menu():
         desc = request.form.get("description","").strip()
         price = request.form.get("price",0,type=int)
         category_id = request.form.get("category_id",type=int)
-        image = request.form.get("image","🍱").strip()[:12] or "🍱"
+        image = request.form.get("image", "").strip()[:500]
         available = 1 if request.form.get("available") else 0
         menu_id = request.form.get("menu_id",type=int)
         if len(name) < 2 or price < 1:
@@ -369,6 +506,41 @@ def admin_menu():
 def delete_menu(menu_id):
     db=get_db(); db.execute("DELETE FROM menu WHERE id=?", (menu_id,)); db.commit()
     flash("Menu berhasil dihapus.", "success"); return redirect(url_for("admin_menu"))
+
+@app.route("/admin/pembayaran", methods=["GET", "POST"])
+@admin_required
+def admin_payment_settings():
+    db = get_db()
+    settings = get_payment_settings()
+    if request.method == "POST":
+        bank_name = request.form.get("bank_name", "").strip()[:80]
+        bank_account = request.form.get("bank_account", "").strip()[:40]
+        bank_holder = request.form.get("bank_holder", "").strip()[:100]
+        qris_image = "" if request.form.get("remove_qris") else settings["qris_image"]
+        upload = request.files.get("qris_image")
+        if upload and upload.filename:
+            try:
+                qris_image = save_payment_image(upload, "qris")
+            except ValueError as error:
+                flash(str(error), "danger")
+                return render_template("admin/payment_settings.html", settings=settings)
+        db.execute("""UPDATE payment_settings
+                      SET bank_name=?, bank_account=?, bank_holder=?, qris_image=?
+                      WHERE id=1""", (bank_name, bank_account, bank_holder, qris_image))
+        db.commit()
+        flash("Informasi pembayaran berhasil disimpan.", "success")
+        return redirect(url_for("admin_payment_settings"))
+    return render_template("admin/payment_settings.html", settings=settings)
+
+@app.get("/admin/bukti-pembayaran/<filename>")
+@admin_required
+def admin_payment_proof(filename):
+    proof = get_db().execute(
+        "SELECT 1 FROM orders WHERE payment_proof=?", (filename,)
+    ).fetchone()
+    if not proof:
+        return "", 404
+    return send_from_directory(PAYMENT_UPLOAD_DIR, filename)
 
 @app.route("/admin/pesanan")
 @admin_required
@@ -508,6 +680,10 @@ def delete_admin_account(admin_id):
 @app.errorhandler(404)
 def not_found(_):
     return render_template("404.html"), 404
+
+@app.errorhandler(413)
+def upload_too_large(_):
+    return "Ukuran file terlalu besar. Batas unggahan adalah 5 MB.", 413
 
 if __name__ == "__main__":
     init_db()

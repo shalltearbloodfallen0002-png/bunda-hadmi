@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Keranjang — Bunda Hadmi{% endblock %}
+{% block title %}Keranjang — Hadmi’s Kitchen{% endblock %}
 
 {% block content %}
 <div class="page-head">
@@ -23,7 +23,7 @@
                     <div class="cart-item">
 
                         <div class="cart-emoji">
-                            {{ item.image or '🍱' }}
+                            <img src="{{ item|menu_photo }}" alt="{{ item.name }}" loading="lazy">
                         </div>
 
                         <div>
@@ -122,7 +122,7 @@
 
         {% else %}
         <div class="empty">
-            <div class="icon">🧺</div>
+            <div class="empty-mark">BH</div>
             <h2>Keranjangmu masih kosong</h2>
             <p>Yuk, pilih menu yang kamu suka.</p>
 
