@@ -387,6 +387,9 @@ def submit_payment_proof(code):
                 # Kembali ke halaman Pesanan Berhasil jika form dikirim dari halaman tersebut.
                 if request.form.get("source") == "success":
                     return redirect(url_for("order_success", code=order["code"]))
+
+                #Jika formulir berasal dari halaman Lacak Pesanan.
+                order = get_db().execute("SELECT * FROM orders WHERE id=?", (order["id"],)).fetchone()
     
     return render_template("track.html", order=order, items=items,
                            cancellable_statuses=CANCELLABLE_STATUSES,
