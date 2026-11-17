@@ -383,6 +383,11 @@ def submit_payment_proof(code):
                     flash("Bukti pembayaran terkirim. Admin akan memeriksa pembayaranmu.", "success")
                 else:
                     flash("Status pesanan berubah. Bukti pembayaran tidak dapat dikirim.", "warning")
+
+                # Kembali ke halaman Pesanan Berhasil jika form dikirim dari halaman tersebut.
+                if request.form.get("source") == "success":
+                    return redirect(url_for("order_success", code=order["code"]))
+    
     return render_template("track.html", order=order, items=items,
                            cancellable_statuses=CANCELLABLE_STATUSES,
                            payment_settings=get_payment_settings())
