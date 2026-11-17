@@ -21,3 +21,6 @@ Thumbs.db
 
 # Log
 *.log
+
+# File bukti pembayaran pelanggan
+Bunda_Hadmi_Implementasi/instance/payment_uploads/
